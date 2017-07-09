@@ -10,14 +10,7 @@
         this.EXIFwrapped = obj;
     };
 
-    if (typeof exports !== 'undefined') {
-        if (typeof module !== 'undefined' && module.exports) {
-            exports = module.exports = EXIF;
-        }
-        exports.EXIF = EXIF;
-    } else {
-        root.EXIF = EXIF;
-    }
+    root.EXIF = EXIF;
 
     var ExifTags = EXIF.Tags = {
 
@@ -128,7 +121,12 @@
         0x0110 : "Model",
         0x0131 : "Software",
         0x013B : "Artist",
-        0x8298 : "Copyright"
+        0x8298 : "Copyright",
+        0x9c9b : "XPTitle",
+        0x9c9c : "XPComment",
+        0x9c9d : "XPAuthor",
+        0x9c9e : "XPKeywords",
+        0x9c9f : "XPSubject"
     };
 
     var GPSTags = EXIF.GPSTags = {
@@ -397,7 +395,7 @@
                     if (this.status == 200 || this.status === 0) {
                         handleBinaryFile(http.response);
                     } else {
-                        throw "Could not load image";
+                        callback(new Error("Could not load image"));
                     }
                     http = null;
                 };
@@ -519,7 +517,20 @@
         0x7A : 'captionWriter',
         0x69 : 'headline',
         0x74 : 'copyright',
-        0x0F : 'category'
+        0x0F : 'category',
+        0x10 : 'imageRank',
+        0x65 : 'country',
+        0x73 : 'source',
+        0x5C : 'venue',
+        0x5a : 'city',
+        0x05 : 'objectName',
+        0x07 : 'editStatus',
+        0x14 : 'supplementalCategories',
+        0x64 : 'countryCode',
+        0x5f : 'state',
+        0x28 : 'specialInstructions',
+        0x65 : 'composition',
+        0x4b : 'objectCycle'
     };
     function readIPTCData(file, startOffset, sectionLength){
         var dataView = new DataView(file);
@@ -736,7 +747,7 @@
 
     function getStringFromDB(buffer, start, length) {
         var outstr = "";
-        for (n = start; n < start+length; n++) {
+        for (var n = start; n < start+length; n++) {
             outstr += String.fromCharCode(buffer.getUint8(n));
         }
         return outstr;
@@ -798,6 +809,10 @@
                     case "FileSource" :
                         exifData[tag] = StringValues[tag][exifData[tag]];
                         break;
+
+                    case "ExposureTime" :
+			            exifData[tag] = exifData[tag].numerator + "/" + exifData[tag].denominator;
+			            break;
 
                     case "ExifVersion" :
                     case "FlashpixVersion" :
@@ -907,7 +922,7 @@
                 var nodeName = item.nodeName;
 
                 if (typeof (obj[nodeName]) == "undefined") {
-                  obj[nodeName] = xml2json(item);
+                  obj[nodeName] = xml2Object(item);
                 } else {
                   if (typeof (obj[nodeName].push) == "undefined") {
                     var old = obj[nodeName];
@@ -915,7 +930,7 @@
                     obj[nodeName] = [];
                     obj[nodeName].push(old);
                   }
-                  obj[nodeName].push(xml2json(item));
+                  obj[nodeName].push(xml2Object(item));
                 }
               }
             } else {
@@ -928,10 +943,10 @@
     }
 
     EXIF.getData = function(img, callback) {
-        if ((self.Image && img instanceof self.Image)
-            || (self.HTMLImageElement && img instanceof self.HTMLImageElement)
-            && !img.complete)
-            return false;
+        if (((self.Image && img instanceof self.Image) || (self.HTMLImageElement && img instanceof self.HTMLImageElement))
+            && !img.complete) {
+          return false;
+        }
 
         if (!imageHasData(img)) {
             getImageData(img, callback);
