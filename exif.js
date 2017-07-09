@@ -495,17 +495,12 @@
                 var sectionLength = dataView.getUint16(offset + 6 + nameHeaderLength);
 
                 return readIPTCData(file, startOffset, sectionLength);
-
-                break;
-
             }
-
 
             // Not the marker, continue searching
             offset++;
 
         }
-
     }
     var IptcFieldMap = {
         0x78 : 'caption',
