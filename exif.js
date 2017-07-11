@@ -10,7 +10,14 @@
         this.EXIFwrapped = obj;
     };
 
-    root.EXIF = EXIF;
+    if (typeof exports !== 'undefined') {
+        if (typeof module !== 'undefined' && module.exports) {
+            exports = module.exports = EXIF;
+        }
+        exports.EXIF = EXIF;
+    } else {
+        root.EXIF = EXIF;
+    }
 
     var ExifTags = EXIF.Tags = {
 
@@ -121,12 +128,7 @@
         0x0110 : "Model",
         0x0131 : "Software",
         0x013B : "Artist",
-        0x8298 : "Copyright",
-        0x9c9b : "XPTitle",
-        0x9c9c : "XPComment",
-        0x9c9d : "XPAuthor",
-        0x9c9e : "XPKeywords",
-        0x9c9f : "XPSubject"
+        0x8298 : "Copyright"
     };
 
     var GPSTags = EXIF.GPSTags = {
@@ -395,7 +397,7 @@
                     if (this.status == 200 || this.status === 0) {
                         handleBinaryFile(http.response);
                     } else {
-                        callback(new Error("Could not load image"));
+                        throw "Could not load image";
                     }
                     http = null;
                 };
@@ -495,12 +497,17 @@
                 var sectionLength = dataView.getUint16(offset + 6 + nameHeaderLength);
 
                 return readIPTCData(file, startOffset, sectionLength);
+
+                break;
+
             }
+
 
             // Not the marker, continue searching
             offset++;
 
         }
+
     }
     var IptcFieldMap = {
         0x78 : 'caption',
@@ -512,20 +519,7 @@
         0x7A : 'captionWriter',
         0x69 : 'headline',
         0x74 : 'copyright',
-        0x0F : 'category',
-        0x10 : 'imageRank',
-        0x65 : 'country',
-        0x73 : 'source',
-        0x5C : 'venue',
-        0x5a : 'city',
-        0x05 : 'objectName',
-        0x07 : 'editStatus',
-        0x14 : 'supplementalCategories',
-        0x64 : 'countryCode',
-        0x5f : 'state',
-        0x28 : 'specialInstructions',
-        0x65 : 'composition',
-        0x4b : 'objectCycle'
+        0x0F : 'category'
     };
     function readIPTCData(file, startOffset, sectionLength){
         var dataView = new DataView(file);
@@ -740,9 +734,16 @@
         return thumbTags;
     }
 
+    function isHTTPInBuffer (buffer, start) {        
+        return buffer.getUint8(start+0) === 0x68 &&
+            buffer.getUint8(start+1) === 0x74 &&
+            buffer.getUint8(start+2) === 0x74 &&
+            buffer.getUint8(start+3) === 0x70;
+    };
+
     function getStringFromDB(buffer, start, length) {
         var outstr = "";
-        for (var n = start; n < start+length; n++) {
+        for (n = start; n < start+length; n++) {
             outstr += String.fromCharCode(buffer.getUint8(n));
         }
         return outstr;
@@ -805,10 +806,6 @@
                         exifData[tag] = StringValues[tag][exifData[tag]];
                         break;
 
-                    case "ExposureTime" :
-			            exifData[tag] = exifData[tag].numerator + "/" + exifData[tag].denominator;
-			            break;
-
                     case "ExifVersion" :
                     case "FlashpixVersion" :
                         exifData[tag] = String.fromCharCode(exifData[tag][0], exifData[tag][1], exifData[tag][2], exifData[tag][3]);
@@ -866,7 +863,7 @@
             dom = new DOMParser();
 
         while (offset < (length-4)) {
-            if (getStringFromDB(dataView, offset, 4) == "http") {
+            if (isHTTPInBuffer(dataView, offset)) {            
                 var startOffset = offset - 1;
                 var sectionLength = dataView.getUint16(offset - 2) - 1;
                 var xmpString = getStringFromDB(dataView, startOffset, sectionLength)
@@ -917,7 +914,7 @@
                 var nodeName = item.nodeName;
 
                 if (typeof (obj[nodeName]) == "undefined") {
-                  obj[nodeName] = xml2Object(item);
+                  obj[nodeName] = xml2json(item);
                 } else {
                   if (typeof (obj[nodeName].push) == "undefined") {
                     var old = obj[nodeName];
@@ -925,7 +922,7 @@
                     obj[nodeName] = [];
                     obj[nodeName].push(old);
                   }
-                  obj[nodeName].push(xml2Object(item));
+                  obj[nodeName].push(xml2json(item));
                 }
               }
             } else {
@@ -938,10 +935,10 @@
     }
 
     EXIF.getData = function(img, callback) {
-        if (((self.Image && img instanceof self.Image) || (self.HTMLImageElement && img instanceof self.HTMLImageElement))
-            && !img.complete) {
-          return false;
-        }
+        if ((self.Image && img instanceof self.Image)
+            || (self.HTMLImageElement && img instanceof self.HTMLImageElement)
+            && !img.complete)
+            return false;
 
         if (!imageHasData(img)) {
             getImageData(img, callback);
